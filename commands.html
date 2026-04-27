@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iGoal — Gerador de Comandos MQTT</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 28px 14px; color: #222; }
+.wrap { max-width: 660px; margin: 0 auto; }
+h1 { color: #0055bb; font-size: 20px; margin-bottom: 3px; font-weight: 700; }
+.sub { color: #888; font-size: 12px; font-family: monospace; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 12px; box-shadow: 0 2px 14px rgba(0,0,0,.09); padding: 22px; margin-bottom: 18px; }
+.card-title { font-size: 12px; font-weight: 700; color: #0055bb; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+.field { margin-bottom: 13px; }
+label { display: block; font-size: 12px; font-weight: 700; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px; }
+label small { font-weight: 400; text-transform: none; letter-spacing: 0; color: #999; }
+input[type=text], input[type=number], input[type=datetime-local], select, textarea {
+  width: 100%; padding: 9px 11px; border: 1.5px solid #ddd; border-radius: 7px;
+  font-size: 13px; font-family: inherit; background: #fff; color: #222; transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: #0055bb; }
+textarea { resize: vertical; font-family: monospace; font-size: 12px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sec-hdr {
+  font-size: 11px; font-weight: 700; color: #0055bb; text-transform: uppercase; letter-spacing: .6px;
+  margin: 16px 0 12px; padding: 8px 10px; background: #f0f6ff;
+  border-left: 3px solid #0055bb; border-radius: 0 5px 5px 0;
+}
+.btn {
+  width: 100%; padding: 12px; background: #0055bb; color: #fff; border: none;
+  border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 6px;
+  transition: background .15s;
+}
+.btn:hover:not(:disabled) { background: #0044aa; }
+.btn:disabled { opacity: .6; cursor: default; }
+.result { margin-top: 20px; border-top: 2px solid #f0f2f5; padding-top: 18px; }
+.result h2 { font-size: 15px; color: #333; margin-bottom: 14px; font-weight: 600; }
+.ibox { margin-bottom: 13px; }
+.lbl { display: block; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+.lbl small { font-weight: 400; text-transform: none; letter-spacing: 0; color: #999; }
+.flex { display: flex; align-items: center; gap: 8px; }
+.mono { font-family: monospace; font-size: 12px; padding: 9px 11px; border-radius: 7px; word-break: break-all; flex: 1; }
+.topic-box { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+.hash-box { background: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; }
+.md5-box { background: #ede7f6; color: #4527a0; border: 1px solid #d1c4e9; }
+pre { background: #1e1e2e; color: #cdd6f4; padding: 13px; border-radius: 7px; font-size: 12px; white-space: pre-wrap; word-break: break-all; margin: 0; }
+.cbtn {
+  padding: 5px 11px; background: #f5f5f5; color: #444; border: 1px solid #ddd;
+  border-radius: 5px; cursor: pointer; font-size: 11px; white-space: nowrap; transition: background .1s;
+}
+.cbtn:hover { background: #e0e0e0; }
+.err { color: #c62828; font-size: 12px; margin-top: 6px; font-weight: 500; }
+.formula {
+  font-size: 11px; color: #555; font-family: monospace; margin-bottom: 14px;
+  padding: 7px 11px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>iGoal — Gerador de Comandos MQTT</h1>
+  <p class="sub">Tópico: igoal/&lt;hash&gt;/command</p>
+
+  <div class="card">
+    <div class="card-title">Gerador de Hash MD5</div>
+    <p class="formula">MD5( SN + Modelo + "iGoal_Gateway" )</p>
+    <div class="row2">
+      <div class="field">
+        <label>Serial Number (SN)</label>
+        <input type="text" id="md5-sn" placeholder="Ex: SN123456789" oninput="md5live()">
+      </div>
+      <div class="field">
+        <label>Modelo</label>
+        <select id="md5-model" onchange="md5live()">
+          <option value="">-- Selecione --</option>
+          <option value="iG9KCEL">iG9KCEL</option>
+          <option value="iG9KETH">iG9KETH</option>
+        </select>
+      </div>
+    </div>
+    <div id="md5-result-box" style="display:none" class="ibox">
+      <span class="lbl">Hash MD5</span>
+      <div class="flex">
+        <div class="mono md5-box" id="md5-result"></div>
+        <button class="cbtn" onclick="cp(this,'md5-result')">Copiar</button>
+      </div>
+    </div>
+    <div id="md5-err" class="err" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Gerador de Comando MQTT</div>
+
+    <div class="field">
+      <label>Comando</label>
+      <select id="cmd" onchange="onCmd()">
+        <option value="">-- Selecione um comando --</option>
+        <optgroup label="Simples (sem MD5)">
+          <option value="getStatus">Status Gateway</option>
+          <option value="reboot">Reboot</option>
+          <option value="deleteStorage">Delete Storage</option>
+          <option value="setTime">Setar RTC</option>
+        </optgroup>
+        <optgroup label="Requer MD5">
+          <option value="forcedFOTA">Atualização de Firmware (FOTA)</option>
+          <option value="readMemInterval">Leitura de Memória</option>
+          <option value="baudrate">Config BaudRate</option>
+          <option value="localDrv">Escrever Driver Local</option>
+          <option value="dvcConfig">Escrever Dispositivo</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Hash do Dispositivo <small>(para o tópico MQTT)</small></label>
+      <input type="text" id="deviceHash" placeholder="Hash/assinatura do dispositivo">
+    </div>
+
+    <div id="sec-md5" style="display:none">
+      <div class="sec-hdr">Identificação para MD5 — SN + Modelo + "iGoal_Gateway"</div>
+      <div class="field">
+        <label>Serial Number (SN)</label>
+        <input type="text" id="sn" placeholder="Ex: SN123456789">
+      </div>
+      <div class="field">
+        <label>Modelo</label>
+        <select id="model">
+          <option value="">-- Selecione --</option>
+          <option value="iG9KCEL">iG9KCEL</option>
+          <option value="iG9KETH">iG9KETH</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="sec-rmi" style="display:none">
+      <div class="sec-hdr">Leitura de Memória</div>
+      <div class="field"><label>Arquivo (file)</label><input type="text" id="rmi-file" value="SSU"></div>
+      <div class="row2">
+        <div class="field"><label>Início</label><input type="datetime-local" id="rmi-start"></div>
+        <div class="field"><label>Fim</label><input type="datetime-local" id="rmi-end"></div>
+      </div>
+    </div>
+
+    <div id="sec-br" style="display:none">
+      <div class="sec-hdr">BaudRate</div>
+      <div class="row2">
+        <div class="field">
+          <label>BAUDRATE <small>(1200–115200)</small></label>
+          <input type="number" id="br-rate" value="9600" min="1200" max="115200">
+        </div>
+        <div class="field">
+          <label>CONFIG</label>
+          <select id="br-config">
+            <option>8N1</option><option>8N2</option><option>8E1</option>
+            <option>8E2</option><option>8O1</option><option>8O2</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-ld" style="display:none">
+      <div class="sec-hdr">Driver Local</div>
+      <div class="field">
+        <label>Nome do Arquivo (dvcName)</label>
+        <input type="text" id="ld-name" placeholder="Nome do driver">
+      </div>
+      <div class="field">
+        <label>Conteúdo do Driver (drvFile) <small>JSON stringificado</small></label>
+        <textarea id="ld-file" rows="4" placeholder='{"chave":"valor",...}'></textarea>
+      </div>
+    </div>
+
+    <div id="sec-dvc" style="display:none">
+      <div class="sec-hdr">Configuração do Dispositivo</div>
+      <div class="field">
+        <label>cfg <small>(edite os valores conforme necessário)</small></label>
+        <textarea id="dvc-cfg" rows="13"></textarea>
+      </div>
+    </div>
+
+    <div id="sec-ds" style="display:none">
+      <div class="sec-hdr">Delete Storage</div>
+      <div class="field"><label>Arquivo (file)</label><input type="text" id="ds-file" value="all"></div>
+    </div>
+
+    <div id="sec-st" style="display:none">
+      <div class="sec-hdr">RTC</div>
+      <div class="field"><label>Data e Hora</label><input type="datetime-local" id="st-dt"></div>
+    </div>
+
+    <div id="errmsg" class="err" style="display:none"></div>
+    <button id="btn-gerar" class="btn" onclick="gerar()">Gerar Comando</button>
+
+    <div id="result" style="display:none" class="result">
+      <h2>Resultado</h2>
+      <div id="res-hash-box" style="display:none" class="ibox">
+        <span class="lbl">Hash MD5 <small>(SN + Modelo + "iGoal_Gateway")</small></span>
+        <div class="flex">
+          <div class="mono md5-box" id="res-hash"></div>
+          <button class="cbtn" onclick="cp(this,'res-hash')">Copiar</button>
+        </div>
+      </div>
+      <div class="ibox">
+        <span class="lbl">Tópico MQTT</span>
+        <div class="flex">
+          <div class="mono topic-box" id="res-topic"></div>
+          <button class="cbtn" onclick="cp(this,'res-topic')">Copiar</button>
+        </div>
+      </div>
+      <div class="ibox">
+        <span class="lbl">Payload (JSON)
+          <button class="cbtn" onclick="cp(this,'res-cmd')" style="margin-left:8px">Copiar</button>
+        </span>
+        <pre id="res-cmd"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SEC_MAP = {
+  getStatus:[], reboot:[], deleteStorage:['sec-ds'], setTime:['sec-st'],
+  forcedFOTA:['sec-md5'], readMemInterval:['sec-md5','sec-rmi'],
+  baudrate:['sec-md5','sec-br'], localDrv:['sec-md5','sec-ld'], dvcConfig:['sec-md5','sec-dvc']
+};
+var ALL_SECS = ['sec-md5','sec-rmi','sec-br','sec-ld','sec-dvc','sec-ds','sec-st'];
+
+function onCmd() {
+  var cmd = document.getElementById('cmd').value;
+  var show = SEC_MAP[cmd] || [];
+  ALL_SECS.forEach(function(id) {
+    document.getElementById(id).style.display = show.indexOf(id) >= 0 ? 'block' : 'none';
+  });
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('errmsg').style.display = 'none';
+}
+
+function md5hex(str) {
+  function safeAdd(x,y){var lsw=(x&0xffff)+(y&0xffff);var msw=(x>>16)+(y>>16)+(lsw>>16);return(msw<<16)|(lsw&0xffff);}
+  function bitRotateLeft(num,cnt){return(num<<cnt)|(num>>>(32-cnt));}
+  function md5cmn(q,a,b,x,s,t){return safeAdd(bitRotateLeft(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}
+  function md5ff(a,b,c,d,x,s,t){return md5cmn((b&c)|((~b)&d),a,b,x,s,t);}
+  function md5gg(a,b,c,d,x,s,t){return md5cmn((b&d)|(c&(~d)),a,b,x,s,t);}
+  function md5hh(a,b,c,d,x,s,t){return md5cmn(b^c^d,a,b,x,s,t);}
+  function md5ii(a,b,c,d,x,s,t){return md5cmn(c^(b|(~d)),a,b,x,s,t);}
+  function unescape(s){var r='';for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c<128)r+=String.fromCharCode(c);else if(c<2048)r+=String.fromCharCode((c>>6)|192,((c&63)|128));else r+=String.fromCharCode((c>>12)|224,((c>>6)&63)|128,((c&63)|128));}return r;}
+  str=unescape(str);
+  var m=[],i,f,arr=[];
+  var length8=str.length*8;
+  for(i=0;i<str.length;i+=4){m[i>>2]=str.charCodeAt(i)+(str.charCodeAt(i+1)<<8)+(str.charCodeAt(i+2)<<16)+(str.charCodeAt(i+3)<<24);}
+  m[str.length>>2]|=0x80<<((str.length%4)*8);
+  m[(((str.length+64)>>>9)<<4)+14]=length8;
+  var a=1732584193,b=-271733879,c=-1732584194,d=271733878;
+  for(i=0;i<m.length;i+=16){
+    var aa=a,bb=b,cc=c,dd=d;
+    a=md5ff(a,b,c,d,m[i],7,-680876936);d=md5ff(d,a,b,c,m[i+1],12,-389564586);c=md5ff(c,d,a,b,m[i+2],17,606105819);b=md5ff(b,c,d,a,m[i+3],22,-1044525330);
+    a=md5ff(a,b,c,d,m[i+4],7,-176418897);d=md5ff(d,a,b,c,m[i+5],12,1200080426);c=md5ff(c,d,a,b,m[i+6],17,-1473231341);b=md5ff(b,c,d,a,m[i+7],22,-45705983);
+    a=md5ff(a,b,c,d,m[i+8],7,1770035416);d=md5ff(d,a,b,c,m[i+9],12,-1958414417);c=md5ff(c,d,a,b,m[i+10],17,-42063);b=md5ff(b,c,d,a,m[i+11],22,-1990404162);
+    a=md5ff(a,b,c,d,m[i+12],7,1804603682);d=md5ff(d,a,b,c,m[i+13],12,-40341101);c=md5ff(c,d,a,b,m[i+14],17,-1502002290);b=md5ff(b,c,d,a,m[i+15],22,1236535329);
+    a=md5gg(a,b,c,d,m[i+1],5,-165796510);d=md5gg(d,a,b,c,m[i+6],9,-1069501632);c=md5gg(c,d,a,b,m[i+11],14,643717713);b=md5gg(b,c,d,a,m[i],20,-373897302);
+    a=md5gg(a,b,c,d,m[i+5],5,-701558691);d=md5gg(d,a,b,c,m[i+10],9,38016083);c=md5gg(c,d,a,b,m[i+15],14,-660478335);b=md5gg(b,c,d,a,m[i+4],20,-405537848);
+    a=md5gg(a,b,c,d,m[i+9],5,568446438);d=md5gg(d,a,b,c,m[i+14],9,-1019803690);c=md5gg(c,d,a,b,m[i+3],14,-187363961);b=md5gg(b,c,d,a,m[i+8],20,1163531501);
+    a=md5gg(a,b,c,d,m[i+13],5,-1444681467);d=md5gg(d,a,b,c,m[i+2],9,-51403784);c=md5gg(c,d,a,b,m[i+7],14,1735328473);b=md5gg(b,c,d,a,m[i+12],20,-1926607734);
+    a=md5hh(a,b,c,d,m[i+5],4,-378558);d=md5hh(d,a,b,c,m[i+8],11,-2022574463);c=md5hh(c,d,a,b,m[i+11],16,1839030562);b=md5hh(b,c,d,a,m[i+14],23,-35309556);
+    a=md5hh(a,b,c,d,m[i+1],4,-1530992060);d=md5hh(d,a,b,c,m[i+4],11,1272893353);c=md5hh(c,d,a,b,m[i+7],16,-155497632);b=md5hh(b,c,d,a,m[i+10],23,-1094730640);
+    a=md5hh(a,b,c,d,m[i+13],4,681279174);d=md5hh(d,a,b,c,m[i],11,-358537222);c=md5hh(c,d,a,b,m[i+3],16,-722521979);b=md5hh(b,c,d,a,m[i+6],23,76029189);
+    a=md5hh(a,b,c,d,m[i+9],4,-640364487);d=md5hh(d,a,b,c,m[i+12],11,-421815835);c=md5hh(c,d,a,b,m[i+15],16,530742520);b=md5hh(b,c,d,a,m[i+2],23,-995338651);
+    a=md5ii(a,b,c,d,m[i],6,-198630844);d=md5ii(d,a,b,c,m[i+7],10,1126891415);c=md5ii(c,d,a,b,m[i+14],15,-1416354905);b=md5ii(b,c,d,a,m[i+5],21,-57434055);
+    a=md5ii(a,b,c,d,m[i+12],6,1700485571);d=md5ii(d,a,b,c,m[i+3],10,-1894986606);c=md5ii(c,d,a,b,m[i+10],15,-1051523);b=md5ii(b,c,d,a,m[i+1],21,-2054922799);
+    a=md5ii(a,b,c,d,m[i+8],6,1873313359);d=md5ii(d,a,b,c,m[i+15],10,-30611744);c=md5ii(c,d,a,b,m[i+6],15,-1560198380);b=md5ii(b,c,d,a,m[i+13],21,1309151649);
+    a=md5ii(a,b,c,d,m[i+4],6,-145523070);d=md5ii(d,a,b,c,m[i+11],10,-1120210379);c=md5ii(c,d,a,b,m[i+2],15,718787259);b=md5ii(b,c,d,a,m[i+9],21,-343485551);
+    a=safeAdd(a,aa); b=safeAdd(b,bb); c=safeAdd(c,cc); d=safeAdd(d,dd);
+  }
+  arr=[a,b,c,d];
+  var hex='';
+  for(i=0;i<arr.length;i++){f=arr[i];for(var j=0;j<4;j++){hex+=('0'+(f&0xff).toString(16)).slice(-2);f>>=8;}}
+  return hex;
+}
+
+function md5live() {
+  var sn = document.getElementById('md5-sn').value.trim();
+  var model = document.getElementById('md5-model').value;
+  var rb = document.getElementById('md5-result-box');
+  document.getElementById('md5-err').style.display = 'none';
+  if (!sn || !model) { rb.style.display = 'none'; return; }
+  var h = md5hex(sn + model + 'iGoal_Gateway');
+  document.getElementById('md5-result').textContent = h;
+  rb.style.display = 'block';
+}
+
+function gerar() {
+  var errel = document.getElementById('errmsg');
+  errel.style.display = 'none';
+  var cmd = document.getElementById('cmd').value;
+  if (!cmd) { errel.textContent = 'Selecione um comando.'; errel.style.display = 'block'; return; }
+  var deviceHash = document.getElementById('deviceHash').value.trim();
+  if (!deviceHash) { errel.textContent = 'Informe o Hash do Dispositivo.'; errel.style.display = 'block'; return; }
+
+  var btn = document.getElementById('btn-gerar');
+  btn.textContent = 'Gerando...'; btn.disabled = true;
+
+  try {
+    var MD5_CMDS = ['forcedFOTA','readMemInterval','baudrate','localDrv','dvcConfig'];
+    var sn = '', model = '', hash = '';
+    if (MD5_CMDS.indexOf(cmd) >= 0) {
+      sn = document.getElementById('sn').value.trim();
+      model = document.getElementById('model').value;
+      if (!sn || !model) throw new Error('SN e Modelo são obrigatórios para este comando.');
+      hash = md5hex(sn + model + 'iGoal_Gateway');
+    }
+
+    var topic = 'igoal/' + deviceHash + '/command';
+    var name, payload;
+
+    switch (cmd) {
+      case 'getStatus':   name='getStatus';  payload={getSts:'true'}; break;
+      case 'reboot':      name='reboot';     payload={reboot:'true'}; break;
+      case 'deleteStorage':
+        name='deleteStorage';
+        payload={hash:deviceHash, file:document.getElementById('ds-file').value||'all'}; break;
+      case 'setTime':
+        var stv = document.getElementById('st-dt').value;
+        if (!stv) throw new Error('Informe a data e hora.');
+        var dt = new Date(stv);
+        name='setTime';
+        payload={hour:dt.getHours(),minute:dt.getMinutes(),second:dt.getSeconds(),
+                 day:dt.getDate(),month:dt.getMonth()+1,year:dt.getFullYear()}; break;
+      case 'forcedFOTA':
+        name='forcedFOTA'; payload={hash:hash,update:'true'}; break;
+      case 'readMemInterval':
+        var sTs = Math.floor(new Date(document.getElementById('rmi-start').value).getTime()/1000);
+        var eTs = Math.floor(new Date(document.getElementById('rmi-end').value).getTime()/1000);
+        if (!sTs || !eTs) throw new Error('Datas de início e fim são obrigatórias.');
+        name='readMemInterval';
+        payload={file:document.getElementById('rmi-file').value||'SSU',start_ts:sTs,end_ts:eTs,hash:hash}; break;
+      case 'baudrate':
+        name='configGateway';
+        payload={hash:hash,file:'baudrate',cfg:{
+          BAUDRATE:parseInt(document.getElementById('br-rate').value)||9600,
+          CONFIG:document.getElementById('br-config').value}}; break;
+      case 'localDrv':
+        name='configGateway';
+        payload={hash:hash,file:'localDrv',cfg:{
+          dvcName:document.getElementById('ld-name').value||'',
+          drvFile:document.getElementById('ld-file').value||''}}; break;
+      case 'dvcConfig':
+        var cfg;
+        try { cfg = JSON.parse(document.getElementById('dvc-cfg').value||'{}'); }
+        catch(e) { throw new Error('JSON do cfg inválido: '+e.message); }
+        name='configGateway'; payload={hash:hash,file:'dvcConfig',cfg:cfg}; break;
+      default: throw new Error('Comando desconhecido: '+cmd);
+    }
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('res-topic').textContent = topic;
+    document.getElementById('res-cmd').textContent = JSON.stringify({name:name,payload:payload},null,2);
+    var hb = document.getElementById('res-hash-box');
+    if (hash) { document.getElementById('res-hash').textContent = hash; hb.style.display = 'block'; }
+    else { hb.style.display = 'none'; }
+    document.getElementById('result').scrollIntoView({behavior:'smooth'});
+
+  } catch(e) {
+    errel.textContent = e.message; errel.style.display = 'block';
+  } finally {
+    btn.textContent = 'Gerar Comando'; btn.disabled = false;
+  }
+}
+
+function cp(btn, id) {
+  var t = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(t).then(function() {
+    btn.textContent = 'Copiado!'; btn.style.background = '#2e7d32'; btn.style.color = '#fff';
+    setTimeout(function(){ btn.textContent = 'Copiar'; btn.style.background = ''; btn.style.color = ''; }, 2000);
+  });
+}
+
+(function init() {
+  var now = new Date(); now.setSeconds(0,0);
+  var iso = now.getFullYear()+'-'+('0'+(now.getMonth()+1)).slice(-2)+'-'+('0'+now.getDate()).slice(-2)
+           +'T'+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+  document.getElementById('st-dt').value = iso;
+  document.getElementById('dvc-cfg').value = JSON.stringify({
+    rs232: 255, time_och: 0, active: [1], model: ["Equipamento X"], type: [1],
+    addr: [20], hash: "topico_do_device", local: [0], port: [1], ipAddr: [""], max_och: [10]
+  },null,2);
+})();
+</script>
+</body>
+</html>
